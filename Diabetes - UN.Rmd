@@ -9,48 +9,92 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
+# Loading in tidyverse and dataset
 library(tidyverse)
 diabetes <- as_tibble(read.csv('diabetes2.csv'))
 
-# Scatter plots using pairs
-pairs(diabetes, lower.panel = NULL)
+# Change Outcome variable to factor with appropriate labels
+diabetes$Outcome <- factor(diabetes$Outcome)
+levels(diabetes$Outcome)
+levels(diabetes$Outcome) <- c("No","Yes")
+levels(diabetes$Outcome)
 ```
-
+The data cleaning will ensure ggplot will color correctly for variabel Outcome
 
 ```{r}
 # Scatter plot using GGpairs
 GGally::ggpairs(diabetes)
 ```
 
+There were a lot of 0s in the plots and they might hurt the correlation so I removed them by Insulin then Glucose.
 
 ```{r}
-# Filter out 0 values in Insulin
+# Filter out 0 values in Insulin and plot pairs
 noNullIns <- diabetes %>% filter(Insulin != 0)
 GGally::ggpairs(noNullIns)
-
 ```
 
+Correlation and graphs look better after taking out 0s from Insulin!
 
 ```{r}
-# Filter out 0 value in Glucose
+# Filter out 0 value in Glucose and plot pairs
 noNullInsGlu <- noNullIns %>% filter(Glucose != 0)
 GGally::ggpairs(noNullInsGlu)
 ```
 
+Some correlations dropped after taking the 0 from Glucose, but graphs look better. 
+
 ```{r}
-# Filter out 0 value in Glucose
+# Filter out 0 value in Glucose and plot pairs
 noNullInsGluBMI <- noNullInsGlu %>% filter(BMI != 0)
 GGally::ggpairs(noNullInsGluBMI)
 ```
 
+I noticed some 0s in BMI so I removed them as well. 
+
 ```{r}
-ggplot(noNullInsGluBMI, aes(Glucose, Insulin, fill = factor(Outcome))) +
+# Scatterplot of Glucose and Insulin with Outcome
+ggplot(noNullInsGluBMI, aes(Glucose, Insulin, color = Outcome)) +
   geom_point()
 ```
 
+The variance was non-constant so Idk.
 
+```{r}
+# Full model and summary
+result <- lm(Glucose ~ Pregnancies + BloodPressure + SkinThickness + Insulin + BMI + DiabetesPedigreeFunction + Age, data=noNullInsGluBMI)
+summary(result)
+```
 
+Pregnancies, skin thickness, BMI, and diabetes pedigree function didn't look significant based on p-values in the presence of the other predictors. Partial F test will be conducted to see if we can drop these variables. 
 
+```{r}
+# Checking for multicollinearity
+faraway::vif(result)
+```
+
+Checking for multicollinearity signs in this model and it looks fine. Everything is definitely under 5 so we're in the clear. 
+
+```{r}
+reduced <- lm(Glucose ~ BloodPressure + Insulin + Age, data=noNullInsGluBMI)
+summary(reduced)
+```
+
+Everything is significant in the reduced model so we'll run with this. 
+
+```{r}
+# Checking for multicollinearity
+faraway::vif(reduced)
+```
+
+No signs of multicollinearity here either. 
+
+```{r}
+# Conducting partial F test
+anova(reduced, result)
+```
+
+Insignificant p-value so we fail to reject the null and favor the reduced model. 
 
 
 
