@@ -9,6 +9,52 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
+library(tidyverse)
+diabetes <- as_tibble(read.csv('diabetes2.csv'))
+
+# Scatter plots using pairs
+pairs(diabetes, lower.panel = NULL)
+```
+
+
+```{r}
+# Scatter plot using GGpairs
+GGally::ggpairs(diabetes)
+```
+
+
+```{r}
+# Filter out 0 values in Insulin
+noNullIns <- diabetes %>% filter(Insulin != 0)
+GGally::ggpairs(noNullIns)
 
 ```
+
+
+```{r}
+# Filter out 0 value in Glucose
+noNullInsGlu <- noNullIns %>% filter(Glucose != 0)
+GGally::ggpairs(noNullInsGlu)
+```
+
+```{r}
+# Filter out 0 value in Glucose
+noNullInsGluBMI <- noNullInsGlu %>% filter(BMI != 0)
+GGally::ggpairs(noNullInsGluBMI)
+```
+
+```{r}
+ggplot(noNullInsGluBMI, aes(Glucose, Insulin, fill = factor(Outcome))) +
+  geom_point()
+```
+
+
+
+
+
+
+
+
+
+
 
