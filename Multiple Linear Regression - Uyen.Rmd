@@ -1,5 +1,5 @@
 ---
-title: "Multiple Linear Regression First Run"
+title: "Multiple Linear Regression Runs"
 author: "Uyen Nguyen"
 output: 
   pdf_document:
@@ -14,14 +14,31 @@ library(tidyverse)
 library(GGally)
 diabetes <- as_tibble(read.csv('diabetes2.csv'))
 
+
 # Change Outcome variable to factor with appropriate labels
 diabetes$Outcome <- factor(diabetes$Outcome)
 levels(diabetes$Outcome)
 levels(diabetes$Outcome) <- c("No","Yes")
 levels(diabetes$Outcome)
 
-diabetes2 <- diabetes %>% filter(Insulin != 0 & Glucose != 0 & BMI != 0)
-# write.csv(diabetes2, 'noNullInsGluBMI.csv')
+diabetes2 <- diabetes
+
+zero_unknown_cols <-c("Glucose", "BloodPressure", "SkinThickness",
+                      "Insulin", "BMI", "DiabetesPedigreeFunction",
+                      "Age")
+
+
+
+diabetes2[,zero_unknown_cols] <- replace(diabetes2[,zero_unknown_cols], diabetes2[,zero_unknown_cols]==0,NA)
+
+diabetes2 <- dplyr::select(diabetes2, -c('SkinThickness', 'Insulin'))
+
+fill_missing_cols <-c("Glucose", "BloodPressure", "BMI",
+                      "DiabetesPedigreeFunction", "Age")
+
+for(i in fill_missing_cols) {
+  diabetes2[,i][is.na(diabetes2[,i])] <- median(diabetes2[,i][!is.na(diabetes2[,i])])
+}
 ```
 
 The data cleaning will ensure ggplot will color correctly for variable Outcome
@@ -65,6 +82,8 @@ ggplot(noNullInsGluBMI, aes(Glucose, Insulin, color = Outcome)) +
 
 The variance was non-constant so Idk.
 
+# First run for MLR
+
 ```{r}
 # Full model and summary
 result <- lm(Glucose ~ Pregnancies + BloodPressure + SkinThickness + Insulin + BMI + DiabetesPedigreeFunction + Age, data=noNullInsGluBMI)
@@ -101,4 +120,6 @@ anova(reduced, result)
 
 Insignificant p-value so we failed to reject the null and favor the reduced model. 
 
+
+# Second run for MLR
 
