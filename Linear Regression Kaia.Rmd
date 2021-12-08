@@ -1,0 +1,227 @@
+---
+title: "Mulyiple Linear Regression"
+author: "Kaia Lindberg"
+date: "12/7/2021"
+output: pdf_document
+---
+
+# Set up
+```{r, results = 'hide', message = FALSE}
+# Import libraries
+library(tidyverse)
+library(ROCR)
+library(MASS)
+```
+
+```{r}
+# Load data
+Data <- read.csv("diabetes2.csv", header=T)
+print(head(Data))
+```
+
+The data has 768 rows and 9 columns. One of these columns (Outcome) will be our response variable for our logistic regression and the others are potential predictors.
+```{r}
+# Check dimensions of data
+print(dim(Data)) # 768 rows and 9 columns
+```
+
+```{r}
+# Display names of all columns
+print(colnames(Data))
+```
+
+
+Before we go any further with our analysis we will split our data into a training and test set. We've chosen a random seed of "123" for reproducability. We will do all further analysis, visualization, and model building using our training data and then use our test data to evaluate our model's performance on unseen data. 
+```{r}
+# Randomly split data into two halves
+set.seed(123) # For reproducability
+sample<-sample.int(nrow(Data), floor(.50*nrow(Data)), replace = F)
+train<-Data[sample, ] # Training data
+test<-Data[-sample, ] # Test data
+```
+
+
+# Data Cleaning
+```{r}
+# List of columns where zero is non-sensical (i.e. zero indicates unknown)
+# All predictor columns other than pregnancies
+zero_unknown_cols <-c("Glucose", "BloodPressure", "SkinThickness",
+                      "Insulin", "BMI", "DiabetesPedigreeFunction",
+                      "Age")
+train[,zero_unknown_cols] <- replace(train[,zero_unknown_cols], train[,zero_unknown_cols]==0,NA)
+test[,zero_unknown_cols] <- replace(test[,zero_unknown_cols], test[,zero_unknown_cols]==0,NA)
+```
+
+```{r}
+# Remove variables with high percent missing
+train <- dplyr::select(train, -c('SkinThickness', 'Insulin'))
+```
+
+```{r}
+# For the remaining missing values (<5% in any column) I'll impute with the median
+fill_missing_cols <-c("Glucose", "BloodPressure", "BMI",
+                      "DiabetesPedigreeFunction", "Age")
+for(i in fill_missing_cols) {
+  train[ , i][is.na(train[ , i])] <- median(train[ , i], na.rm=TRUE)
+}
+
+# Do the same for the test data
+for(i in fill_missing_cols) {
+  test[ , i][is.na(test[ , i])] <- median(test[ , i], na.rm=TRUE)
+}
+```
+
+# Linear Regression Model
+## Fit Initial Model
+```{r}
+# Fit initial regression model
+train <- dplyr::select(train, -c('Outcome')) # Remove Outcome from potential predictors
+full <- lm(Glucose~., data=train)
+summary(full)
+```
+
+Only BMI and Age are statistically signficant in predicting Glucose. Let's test whether we can drop Pregnancies, BloodPressure, and DiabetesPedigreeFunction from our model.
+
+## Fit reduced model
+```{r}
+# Fit a reduced model using only BMI and age
+reduced <- lm(Glucose~BMI + Age, data=train)
+summary(reduced)
+```
+
+```{r}
+# Partial f test
+anova(reduced, full)
+```
+
+This p-value is larger than an alpha of 0.05 so we fail to reject the null hypothesis. We do not have sufficient evidence to support the claim that at least one of the coefficients in the null hypothesis is non-zero and thus the simpler model (using only BMI and age) is sufficient.
+
+## Check regression assumptions
+```{r}
+# Calculate fitted y and residual
+yhat <- reduced$fitted.values
+residual <- reduced$residuals
+# Add to data
+train <- data.frame(train, yhat, residual)
+# Create residual plot
+ggplot(train, aes(x=yhat, y=residual)) +
+geom_point() +
+geom_hline(yintercept=0, color="red") +
+labs(x="Predicted Glucose", y= "Residual", title="Residual Plot for Reduced MLR (BMI and Age)")
+```
+
+The residual plot for this reduced model seems to have non-constant variance as the residuals appear closer to 0 for low predicted glucose and further away from 0 (larger variance) for larger values of predicted glucose. However, there does not appear to be any pattern to the residuals so I believe mean zero assumption is met.
+
+```{r}
+boxcox(reduced, lambda = seq(-2,2))
+```
+
+The interval for the box cox plot does not include 1, suggesting that a y-transformation is warranted and could help improve the constant variance assumption. Since 0 is in the interval will do a log transformation, this will also let us maintain interpretability of our coefficients.
+
+```{r}
+# Transform response variable
+train <- train %>% 
+  mutate(ystar = log(Glucose))
+# Fit reduced model with transformed y
+reduced.ystar<-lm(ystar~BMI + Age, data=train)
+summary(reduced.ystar)
+```
+
+```{r}
+# Calculate fitted y and residual for log(y) model
+yhat.ystar <- reduced.ystar$fitted.values
+residual.ystar <- reduced.ystar$residuals
+# Add to data
+train <- data.frame(train, yhat.ystar, residual.ystar)
+# Create residual plot
+ggplot(train, aes(x=yhat.ystar, y=residual.ystar)) +
+geom_point() +
+geom_hline(yintercept=0, color="red") +
+labs(x="Predicted Log(Glucose)", y= "Residual", title="Residual Plot for Reduced MLR (BMI and Age) with Log(y)")
+```
+
+This residual plot looks better. Variance is more constant than before. Confirmed with box cox plot below in which 1 is in the interval and thus we do not need to transform y any further. There also does not appear to be any pattern/shape to the residuals and thus I think the mean zero assumption is met and thus we don't need to transform any of our predictors. 
+
+```{r}
+boxcox(reduced.ystar, lambda = seq(-2,2))
+```
+
+```{r}
+acf(train$residual.ystar, main="ACF Plot") #Create ACF plot to see if errors are independent
+```
+
+ACF slightly exceeds interval at lag 4, but is minor and all other lags are fine so I'd say this assumption is met.
+
+
+```{r}
+#Check that errors are normally distributed
+qqnorm(train$residual.ystar)
+qqline(train$residual.ystar, col="red")
+```
+
+Based on the QQ plot, the observations generally follow the theoretical values (red straight line) fairly well. There are some minor deviations in the tails, but for the most part the observations follow the red line very well, which suggests that the normality assumption is met and the errors are normally distributed. 
+
+
+
+
+# Some other exploration
+Don't need to use this, just wanted to test out. 
+
+## Re-check other predictors with transformed y
+Now that we've transformed our y variable, I wonder if that changes any of the variables that were insignificant before?
+```{r}
+# Fit full model with transformed y
+full.ystar<-lm(ystar~BMI + Age + Pregnancies + BloodPressure + DiabetesPedigreeFunction, data=train)
+summary(full.ystar)
+```
+No, that did not change anything. Other predictors are still insignificant. Double checked with partial f test, but that suggests we can drop all three predictors (Pregnancies, BloodPressure, and DiabetesPedigreeFunction).
+
+
+```{r}
+# Partial f test
+anova(reduced.ystar, full.ystar)
+```
+
+
+
+
+## Automated search procedure(s)
+### Backward elimination
+```{r}
+# Declare intercept only model
+regnull <- lm(ystar~1, data=train)
+# Declare full model
+regfull <- lm(ystar~ BMI + Age + Pregnancies + BloodPressure + DiabetesPedigreeFunction, data=train)
+# Run backward elimination
+step(regfull, scope=list(lower=regnull, upper=regfull), direction="backward")
+```
+
+Backward selection would suggest we include DiabetesPedigreeFunction as well.
+
+### Forward selection
+```{r}
+# Run forward selection
+step(regnull, scope=list(lower=regnull, upper=regfull), direction="forward")
+```
+
+Forward selection also suggests we include DiabetesPedigreeFunction.
+
+
+```{r}
+# Run stepwise selection
+step(regnull, scope=list(lower=regnull, upper=regfull), direction="both")
+```
+
+Same model again, including DiabetesPedigreeFunction. So let's fit that model and check if DiabetesPedigreeFunction. is signficant.
+
+```{r}
+# Fit model with transformed y 
+# Reduced model plus DiabetesPedigreeFunction.
+reduced.ystar.dpf<-lm(ystar~BMI + Age + DiabetesPedigreeFunction, data=train)
+summary(reduced.ystar.dpf)
+```
+
+This summary still suggests that we can drop DiabetesPedigreeFunction as it does not add much value in predicting Glucose when Age and BMI are already fit in the model. 
+
+
+
