@@ -1,5 +1,5 @@
 ---
-title: "Uyen's Rmd"
+title: "Multiple Linear Regression First Run"
 author: "Uyen Nguyen"
 output: 
   pdf_document:
@@ -7,7 +7,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
 
 # Loading in tidyverse and dataset
 library(tidyverse)
@@ -18,8 +18,12 @@ diabetes$Outcome <- factor(diabetes$Outcome)
 levels(diabetes$Outcome)
 levels(diabetes$Outcome) <- c("No","Yes")
 levels(diabetes$Outcome)
+
+diabetes2 <- diabetes %>% filter(Insulin != 0 & Glucose != 0 & BMI != 0)
+# write.csv(diabetes2, 'noNullInsGluBMI.csv')
 ```
-The data cleaning will ensure ggplot will color correctly for variabel Outcome
+
+The data cleaning will ensure ggplot will color correctly for variable Outcome
 
 ```{r}
 # Scatter plot using GGpairs
@@ -94,11 +98,6 @@ No signs of multicollinearity here either.
 anova(reduced, result)
 ```
 
-Insignificant p-value so we fail to reject the null and favor the reduced model. 
-
-
-
-
-
+Insignificant p-value so we failed to reject the null and favor the reduced model. 
 
 
