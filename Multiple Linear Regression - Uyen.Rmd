@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE)
 # Loading in tidyverse and dataset
 library(tidyverse)
 library(GGally)
+library(MASS)
 diabetes <- as_tibble(read.csv('diabetes2.csv'))
 
 
@@ -122,4 +123,87 @@ Insignificant p-value so we failed to reject the null and favor the reduced mode
 
 
 # Second run for MLR
+
+## Scatterplots
+```{r}
+GGally::ggpairs(diabetes2)
+```
+
+## Full MLR with Pregnancies, Blood Pressure, BMI, DiabetesPedigeeFunction, and Age
+```{r}
+result2 <- lm(Glucose ~ Pregnancies + BloodPressure + BMI + DiabetesPedigreeFunction + Age, data = diabetes2)
+summary(result2)
+```
+
+Pregnancies was insignificant in the presence of other variables so it's dropped.
+
+## Reduced MLR with Pregnancies dropped
+```{r}
+reduced2 <- lm(Glucose ~ BloodPressure + BMI + DiabetesPedigreeFunction + Age, data = diabetes2)
+summary(reduced2)
+```
+
+## Residual plot of reduced model
+```{r}
+yhat <- result2$fitted.values
+res <- result2$residuals
+diabetes2 <- data.frame(diabetes2, yhat, res)
+
+ggplot(diabetes2, aes(x = yhat,y = res))+
+  geom_point()+
+  geom_hline(yintercept=0, color="red")+
+  labs(x="Fitted y",
+       y="Residuals",
+       title="Residual Plot")
+```
+
+## BoxCox of reduced model
+```{r}
+boxcox(reduced2)
+```
+
+Does not need any transformation on the response variable
+
+## ACF of reduced model
+```{r}
+acf(res, main = "ACF Plot of Reduced Residuals")
+```
+Lag 19 and 20 look sus
+
+
+## QQ plot of reduced
+```{r}
+qqnorm(res)
+qqline(res, col = "red")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
