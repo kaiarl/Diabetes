@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE)
 
 # Loading in tidyverse and dataset
 library(tidyverse)
+library(GGally)
 diabetes <- as_tibble(read.csv('diabetes2.csv'))
 
 # Change Outcome variable to factor with appropriate labels
