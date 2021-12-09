@@ -178,9 +178,20 @@ qqline(res, col = "red")
 ```
 
 
+```{r}
+ystar <- log(diabetes2$Glucose)
+diabetes2 <- data.frame(diabetes2, ystar)
+```
 
 
+```{r}
+reduced3 <- lm(Glucose ~ BloodPressure + BMI + DiabetesPedigreeFunction + Age, data = diabetes2)
+summary(reduced3)
+```
 
+```{r}
+boxcox(reduced3)
+```
 
 
 
