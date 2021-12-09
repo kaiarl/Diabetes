@@ -194,15 +194,41 @@ boxcox(reduced3)
 ```
 
 
+```{r}
+reduced3log <- lm(ystar ~ BloodPressure + BMI + DiabetesPedigreeFunction + Age, data = diabetes2)
+summary(reduced3log)
+```
+
+
+```{r}
+yhat3log <- reduced3log$fitted.values
+res3 <- reduced3log$residuals
+diabetes2 <- data.frame(diabetes2, yhat3log, res3)
+
+ggplot(diabetes2, aes(x = yhat3log,y = res3))+
+  geom_point()+
+  geom_hline(yintercept=0, color="red")+
+  labs(x="Fitted log y",
+       y="Residuals",
+       title="Residual Plot from Reduced 3 log")
+```
+
+
+```{r}
+boxcox(reduced3log)
+```
+
+
+```{r}
+acf(reduced3log$residuals)
+```
 
 
 
-
-
-
-
-
-
+```{r}
+qqnorm(reduced3log$residuals)
+qqline(reduced3log$residuals, col = "red")
+```
 
 
 
