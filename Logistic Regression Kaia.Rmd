@@ -1,7 +1,7 @@
 ---
 title: "Diabetes Logistic Regression"
 author: "Kaia Lindberg"
-date: "12/5/2021"
+date: "12/11/2021"
 output: pdf_document
 ---
 
@@ -30,30 +30,31 @@ print(colnames(Data))
 ```
 
 
-Before we go any further with our analysis we will split our data into a training and test set. We've chosen a random seed of "123" for reproducability. We will do all further analysis, visualization, and model building using our training data and then use our test data to evaluate our model's performance on unseen data. 
+Before we go any further with our analysis we will split our data into a training and test set. We've chosen a random seed of "123" for reproducability. We will do all further analysis, visualization, and model building using our training data and then use our test data to evaluate our model's performance on unseen data. Since our data isn't particularly large (768 rows), we chose a 60/40 split so that we would have more data for training and thus have more stable model results.
 ```{r}
 # Randomly split data into two halves
 set.seed(123) # For reproducability
-sample<-sample.int(nrow(Data), floor(.50*nrow(Data)), replace = F)
+sample<-sample.int(nrow(Data), floor(.60*nrow(Data)), replace = F)
 train<-Data[sample, ] # Training data
 test<-Data[-sample, ] # Test data
 ```
 
 
 # Data Cleaning
+Before creating our linear models we needed to make sure that our data was clean. First, we checked for missing values. At first glance there did not appear to be any missing values. 
 ```{r}
 # Check for missing values in each column
 colSums(is.na(train))
 ```
-It appears that there are no missing values.
 
+Next, we created a summary of each variable in our data including the mean and five number summary. 
 
 ```{r}
 # Summary of columns
 print(summary(train))
 ```
 
-This summary shows us the distribution of each variable. For example, we can see that the patients in the dataset range from age 21 to 70 with a median of 29 and mean of 33.4. Since we mean age is greater than the median age we can tell that the age distribution is skewed right. From this summary of the data we also observe some non-sensical values. For example some participants have a recorded BMI of 0 or an insulin value of 0, which cannot occur logically. Although there were no missing values above, we suspect that 0 was zero was recorded in place of missing data.The only variables for which a zero makes sense are pregnancies and outcome. For any other variable we'll fill zero with unknown and then evaluate the best way to handle unknowns (i.e. replace unknown with mean). We will do this for both the train and test sets even though we won't be using the test data until later.
+This summary shows us the distribution of each variable. For example, we can see that the patients in the dataset range from age 21 to 70 with a median of 29 and mean of 33.3. Since we mean age is greater than the median age we can tell that the age distribution is skewed right. From this summary of the data we also observe some non-sensical values. For example some participants have a recorded BMI of 0 or an insulin value of 0, which cannot occur logically. Although there were no missing values above, we suspect that 0 was zero was recorded in place of missing data. The only variables for which a zero makes sense are pregnancies and outcome. For any other variable we'll fill zero with unknown and then evaluate the best way to handle unknowns. We will do this for both the train and test sets even though we won't be using the test data until later.
 
 ```{r}
 # List of columns where zero is non-sensical (i.e. zero indicates unknown)
@@ -61,36 +62,39 @@ This summary shows us the distribution of each variable. For example, we can see
 zero_unknown_cols <-c("Glucose", "BloodPressure", "SkinThickness",
                       "Insulin", "BMI", "DiabetesPedigreeFunction",
                       "Age")
+
+# Replace zeros with unknowns
 train[,zero_unknown_cols] <- replace(train[,zero_unknown_cols], train[,zero_unknown_cols]==0,NA)
 test[,zero_unknown_cols] <- replace(test[,zero_unknown_cols], test[,zero_unknown_cols]==0,NA)
 ```
+
+Now that we have encoded our unknown values we checked what percent of observations were unknown for each variable. 
 
 ```{r}
 # Check for missing values in each column again
 round(colSums(is.na(train))/dim(train)[1],2)
 ```
-Now we can see that a large portion of some columns have missing data, especially Insulin with 48% missing and SkinThickness with 29%. Now that we've identified the missing values we need to handle them before we continue with our analysis. For now I am going to remove the variable with over 25% missing because I don't think they would be reliable predictors with so much missing data.
+We observed that a large portion of some columns have missing data, especially Insulin with 48% missing and SkinThickness with 30%. Now that we've identified the missing values we needed to handle them before we continue with our analysis. We removed variables with over 25% missing (Insulin and Skin Thickness) because we didn't think they would be reliable predictors with so much missing data and we didn't want to drop nearly 50% of our data.
 ```{r}
 # Remove variables with high percent missing
 train <- select(train, -c('SkinThickness', 'Insulin'))
+test <- select(test, -c('SkinThickness', 'Insulin'))
 ```
 
-For the remaining columns I will impute the missing values with the median for that column. 
+For the remaining data we chose to remove any unknowns. Before doing so we checked what percent of the data would be dropped. Seeing that this was only about 6% we thought that was reasonable given that it would give us a complete dataset so we went ahead and dropped any rows with missing values.
 ```{r}
-# For the remaining missing values (<5% in any column) I'll impute with the median
-fill_missing_cols <-c("Glucose", "BloodPressure", "BMI",
-                      "DiabetesPedigreeFunction", "Age")
-for(i in fill_missing_cols) {
-  train[ , i][is.na(train[ , i])] <- median(train[ , i], na.rm=TRUE)
-}
-
-# Do the same for the test data
-for(i in fill_missing_cols) {
-  test[ , i][is.na(test[ , i])] <- median(test[ , i], na.rm=TRUE)
-}
+# Check what percent of our test data we will drop
+round(sum(!complete.cases(train))/dim(train)[1],2)
 ```
 
-Our outcome variable (Diabetes) is currently numeric as it is labeled as 0/1. We'll convert this to a factor and label the outcomes so that R treats it as a categorical response.
+```{r}
+# Drop rows with missing data from our train and test data
+train <- train[complete.cases(train), ]
+test <- test[complete.cases(test), ]
+```
+
+
+Our outcome variable (Diabetes) was originally labeled as 0/1. We converted this to a factor and labeled the outcomes so that R treated it as a categorical response.
 ```{r}
 # Create diabetes factor column with labels from outcome column 
 train$Outcome<-factor(train$Outcome)
@@ -115,7 +119,7 @@ ggplot(train, aes(x=Outcome)) +
 
 ```
 
-About 35% of patients in this data set have diabetes while 65% do not. More don't have diabetes, but this is not a huge imbalance.
+About 36% of patients in this data set have diabetes while 64% do not. More don't have diabetes, but this is not a huge imbalance.
 
 ## Visualizaling Response and Potential Predictors
 ### Pregnancies
@@ -167,7 +171,7 @@ ggplot(train, aes(x=DiabetesPedigreeFunction, color=Outcome)) +
   geom_density() +
   labs(x="Diabetes Pedigree Function", y="Density", title="Density Plot of Diabetes Pedigree Function by Diabetes Outcome")
 ```
-Those with lower Diabetes Pedigree Functions (less family history of diabetes???) appear less likely to have diabetes.
+Those with lower Diabetes Pedigree Functions (less family history of diabetes) appear less likely to have diabetes.
 
 ### Age
 ```{r}
@@ -191,7 +195,10 @@ ggplot(train, aes(x=BMI, y=Age, color=Outcome)) +
 ```
 
 # Logistic Regression Model
+
+Now that we had cleaned and visualized our data we could start fitting our models. For logistic regression we wanted to predict which patients have diabetes. 
 ## Fit Initial Model
+For our initial logistic regression model we included all of our potential predictors (after dropping those with higher percent missing values), which included Pregnancies, Glucose, Blood Pressure, BMI, Diabetes Pedigree Function, and Age. 
 ```{r}
 # Fit initial regression model
 full <- glm(Outcome~., family="binomial", data=train)
@@ -202,14 +209,14 @@ Based on the summary of this initial logistic regression model we observe that G
 
 
 ## Test Hypothesis on Subset of Parameters
-We will test whether we can drop all three of these predictors. For this test our null hypothesis will be $H_0: \beta_{BloodPressure} = \beta_{DiabetesPredigreeFunction} = \beta_{Age} = 0$ and the alternative is $H_A:$ at least one $\beta$ in $H_0$ is non-zero. 
+We will test whether we can drop all three of these insignificant predictors. For this test our null hypothesis will be $H_0: \beta_{BloodPressure} = \beta_{DiabetesPredigreeFunction} = \beta_{Age} = 0$ and the alternative is $H_A:$ at least one $\beta$ in $H_0$ is non-zero. 
 
 ```{r}
 reduced <- glm(Outcome~Pregnancies + Glucose + BMI, family="binomial", data=train)
 summary(reduced)
 ```
 
-All of the predictors in this three variable model are statistically significant. 
+All of the predictors in this three variable model are statistically significant. Let's test whether we can use this reduced model by calculating the difference in deviance between this reduced model and our full model. 
 
 ```{r}
 # Test statistic
@@ -218,28 +225,60 @@ test_stat <- reduced$deviance - full$deviance
 p_value <- 1 - pchisq(test_stat, 3)
 p_value
 ```
-The p-value of 0.10 is not less than our significance level of 0.05 so we fail to reject the null hypothesis. We don't have enough evidence to say that any of the three variables we dropped in the reduced model have a non-zero coefficient and thus we can use our reduced model with just Pregnancies, Glucose, and BMI to predict diabetes.
 
-## Test Whether Model is Useful
-Next, we'll test whether our reduced model is useful in predicting diabetes. In other words, can we drop all coefficients from our model? We'll start from our reduced model given the results from our hypothesis test above. For this test our null hypothesis will be $H_0: \beta_{Pregnancies} = \beta_{Glucose} = \beta_{BMI} = 0$ and the alternative is $H_A:$ at least one $\beta$ in $H_0$ is non-zero. 
+This p-value of 0.048 is less than our significance level of 0.05 so we reject the null hypothesis and conclude that at least one of the predictors that we dropped is useful in predicting diabetes. Looking back at the standard errors of our full model, we observed that Age and Diabetes Pedigree Function had p-values of 0.06, just above our cutoff of 0.05 so perhaps these two variables should remain in our model.
+
+```{r}
+reduced2 <- glm(Outcome~Pregnancies + Glucose + BMI + DiabetesPedigreeFunction + Age, family="binomial", data=train)
+summary(reduced2)
+```
+
+In this 5 variable model we observe that neither Age nor Diabetes Pedigree Function are statistically significant. Perhaps we should keep only Diabetes Pedigree Function?
+
+```{r}
+reduced3 <- glm(Outcome~Pregnancies + Glucose + BMI + DiabetesPedigreeFunction, family="binomial", data=train)
+summary(reduced3)
+```
+
+Alas, in this four variable model all of the predictors are statistically significant. We will confirm this result by testing whether we can drop Age and Blood Pressure from our model. For this test our null hypothesis will be $H_0: \beta_{BloodPressure} = \beta_{Age} = 0$ and the alternative is $H_A:$ at least one $\beta$ in $H_0$ is non-zero. 
+
 ```{r}
 # Test statistic
-test_stat2 <- reduced$null.deviance - reduced$deviance
+test_stat2 <- reduced3$deviance - full$deviance
 # P-value
-p_value2 <- 1 - pchisq(test_stat2, 3)
+p_value2 <- 1 - pchisq(test_stat2, 2)
 p_value2
+```
+
+The p-value of 0.16 is not less than our significance level of 0.05 so we fail to reject the null hypothesis. We don't have enough evidence to say that any of the two variables (Age and Blood Pressure) we dropped in our new reduced model have a non-zero coefficient and thus we can use our reduced model with just Pregnancies, Glucose, BMI, and Diabetes Pedigree Function to predict diabetes.
+
+## Test Whether Model is Useful
+Next, we'll test whether our reduced model is useful in predicting diabetes. In other words, can we drop all coefficients from our model? We'll start from our reduced model given the results from our hypothesis test above. For this test our null hypothesis will be $H_0: \beta_{Pregnancies} = \beta_{Glucose} = \beta_{BMI} = \beta_{DiabetesPedigreeFunction} = 0$ and the alternative is $H_A:$ at least one $\beta$ in $H_0$ is non-zero. 
+```{r}
+# Test statistic
+test_stat3 <- reduced3$null.deviance - reduced$deviance
+# P-value
+p_value3 <- 1 - pchisq(test_stat3, 4)
+p_value3
 ```
 
 The p-value for this hypothesis is 0 so we reject the null hypothesis and conclude that at least one of predictors has a non-zero coefficient and thus this logistic regression model is useful in estimating the odds of developing diabetes.
 
 ## Interpreting Model's Coefficients
 ```{r}
-reduced
+reduced3
 ```
 
-Our estimated logistic regression equation is: $log(\dfrac{\hat{\pi}}{1-\hat{\pi}}) = -8.03725 + 0.10682*Pregnancies + 0.03345*Glucose + 0.08430*BMI$. All three of these predictors have positive coefficients, suggesting that for larger number of pregnancies, higher glucose concentration, and higher BMI the odds of having diabetes goes up, with all other variables held constant.
+Our estimated logistic regression equation is: $log(\dfrac{\hat{\pi}}{1-\hat{\pi}}) = -8.90583 + 0.13145*Pregnancies + 0.03582*Glucose + 0.08697*BMI + 0.73497*DiabetesPedigreeFunction$. All three of these predictors have positive coefficients, suggesting that for larger number of pregnancies, higher glucose concentration, higher BMI, and higher diabetes pedigree function the odds of having diabetes goes up, with all other variables held constant.
 
-The estimated coefficient for pregnancies is 0.10682. This means that for each additional pregnancies the log odds that the woman will have diabetes increases by 0.10682 while controlling for glucose concentration and BMI. In other words, for each one unit increase in pregnancies the odds that the woman has diabetes is multiplied by 1.112734, while holding the other variables constant.
+The estimated coefficient for pregnancies is 0.13145. This means that for each additional pregnancies the log odds that the woman will have diabetes increases by 0.13145 while controlling for glucose concentration and BMI. In other words, for each one unit increase in pregnancies the odds that the woman has diabetes is multiplied by 1.140481, while holding the other variables constant.
+
+```{r}
+exp(0.13145)
+```
+
+TODO: interpretations of other coefficients.
+
 
 ## Model Evaluation
 Use model built on training data to estimate the probabilities for observations in the unseen test data set. 
@@ -247,7 +286,7 @@ Use model built on training data to estimate the probabilities for observations 
 ### Plot ROC curve
 ```{r}
 # Predicted diabetes rate
-preds <- predict(reduced, newdata=test, type="response")
+preds <- predict(reduced3, newdata=test, type="response")
 # Transform input data
 rates <- prediction(preds, test$Outcome)
 # Store true positive and false positive rates
@@ -265,7 +304,7 @@ auc <- performance(rates, measure="auc")
 auc@y.values
 ```
 
-The value of AUC for the ROC curve above is 0.856597 Since this value is greater than 0.5 the model does better than random for classifying who develops diabetes. 
+The value of AUC for the ROC curve above is 0.8386144. Since this value is greater than 0.5 the model does better than random for classifying who develops diabetes. 
 
 ### Create Confusion Matrix
 TODO QUESTION: what do we want to use for a threshold? I just did 0.5 for now, but maybe in predicting diabetes, due to the health implications, we may be more concerned about false negatives (classify someone as not having diabetes when they do have it) so we've chose a threshold lower than 0.5. With this lower threshold we'll have a lower false negative rate (as desired), but as a result would have a higher false positive rate. 
@@ -276,11 +315,11 @@ table(test$Outcome, preds>threshold)
 
 ```{r}
 # Accuracy
-(226+79)/(226+24+55+79)
+(174+52)/(174+22+43+52)
 # TPR
-79/(55+79)
+52/(43+52)
 # TNR
-226/(226+24)
+174/(174+22)
 ```
-At a threshold of 0.5, the models' overall accuracy is 79% with a true positive rate of 59% and a false positive rate of 90.4%. 
+At a threshold of 0.5, the models' overall accuracy is 78% with a true positive rate of 55% and a true negative rate of 89%. 
 
