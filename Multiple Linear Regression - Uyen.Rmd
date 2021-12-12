@@ -43,12 +43,17 @@ diabetes2 <- diabetes2[complete.cases(diabetes2),]
 ## Scatterplots
 ```{r}
 GGally::ggpairs(diabetes2)
+
+# All of the potential explanatory variables have positive correlation to glucose, though none have a correlation coefficient above 27%.
 ```
 
 ## Full MLR with Pregnancies, Blood Pressure, BMI, DiabetesPedigeeFunction, and Age
 ```{r}
 result <- lm(Glucose ~ Pregnancies + BloodPressure + BMI + DiabetesPedigreeFunction + Age, data = diabetes2)
 summary(result)
+
+# The full model is highly statistically significant in predicting glucose, judging by the F-test statstic.  
+# However, one of its explanatory variables, Pregnencies, is not (t-test p-value of 71%). 
 ```
 
 ```{r}
@@ -62,22 +67,30 @@ ggplot(diabetes2, aes(x = yhat,y = res))+
   labs(x="Fitted y",
        y="Residuals",
        title="Residual Plot from full MLR")
+       
+# The residual scatterplot shows non-constant variance, suggesting a transformation on the y-variable is needed. 
 ```
 
 
 ```{r}
 boxcox(result)
+
+# According to the Box-Cox plot, we should take the log of the y-variable (glucose). 
 ```
 
 
 ```{r}
 acf(result$residuals)
+
+# The ACF plot does not show any significant autocorrelation. 
 ```
 
 
 ```{r}
 qqnorm(result$residuals)
 qqline(result$residuals, col = "red")
+
+# The QQ plot is not a perfect line, but it is close enough. 
 ```
 
 
@@ -86,10 +99,15 @@ ystar <- log(diabetes2$Glucose)
 diabetes2 <- data.frame(diabetes2, ystar)
 ```
 
-
+## Final MLR with Blood Pressure, BMI, DiabetesPedigeeFunction, and Age
 ```{r}
 resultLog <- lm(ystar ~ BloodPressure + BMI + DiabetesPedigreeFunction + Age, data = diabetes2)
 summary(resultLog)
+
+# Here we fit a log-transformed version of the rediced model (dropping Pregnencies). 
+# The model is highly significant (p-value of F-test is nearly 0). 
+# All of the individual explanatory variables are significant at the 95% confidence level. 
+# Unfortunately, the adjusted R-squared of the model is only 12.24%, which means it only explains 12.24% of the variation in blood glucose. 
 ```
 
 
@@ -104,16 +122,22 @@ ggplot(diabetes2, aes(x = yhatLog,y = resLog))+
   labs(x="Fitted log y",
        y="Residuals",
        title="Residual Plot from Reduced 3 log")
+       
+# The residual plot looks much better (mostly random). 
 ```
 
 
 ```{r}
 boxcox(resultLog)
+
+# The Box-Cox plot lines include 1, so no further transformation is necessary. 
 ```
 
 
 ```{r}
 acf(resultLog$residuals)
+
+# The ACF plot does not show any significant autocorrelation. 
 ```
 
 
@@ -121,19 +145,11 @@ acf(resultLog$residuals)
 ```{r}
 qqnorm(resultLog$residuals)
 qqline(resultLog$residuals, col = "red")
+
+# The QQ plot is not a perfect line, but it is close enough. 
 ```
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+## Our final model is statistically significant as a whole, and all of its explanatory variables are significant as well. 
+## The final model satisifies all the assumptions of linear regression. 
+## The only problem is the low adjusted R-squared, which reduces the practical usefulness of the model.
