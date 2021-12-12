@@ -13,6 +13,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE)
 library(tidyverse)
 library(GGally)
 library(MASS)
+library(faraway)
 
 # Raw diabetes set (768 rows by 9 variables)
 diabetes <- as_tibble(read.csv('diabetes2.csv'))
@@ -104,7 +105,7 @@ diabetes2 <- data.frame(diabetes2, ystar)
 resultLog <- lm(ystar ~ BloodPressure + BMI + DiabetesPedigreeFunction + Age, data = diabetes2)
 summary(resultLog)
 
-# Here we fit a log-transformed version of the rediced model (dropping Pregnencies). 
+# Here we fit a log-transformed version of the final model (without Pregnencies). 
 # The model is highly significant (p-value of F-test is nearly 0). 
 # All of the individual explanatory variables are significant at the 95% confidence level. 
 # Unfortunately, the adjusted R-squared of the model is only 12.24%, which means it only explains 12.24% of the variation in blood glucose. 
@@ -150,6 +151,15 @@ qqline(resultLog$residuals, col = "red")
 ```
 
 
+
+```{r}
+vif(resultLog)
+
+# The VIFs are very low and suggest that multicollinearity is not a problem. 
+```
+
+
+
 ## Our final model is statistically significant as a whole, and all of its explanatory variables are significant as well. 
-## The final model satisifies all the assumptions of linear regression. 
-## The only problem is the low adjusted R-squared, which reduces the practical usefulness of the model.
+## The final model satisifies all the assumptions of linear regression. Multicollinearity is not a problem. 
+## The only issue is the low adjusted R-squared, which reduces the practical usefulness of the model.
