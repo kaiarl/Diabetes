@@ -41,7 +41,7 @@ test<-Data[-sample, ] # Test data
 
 
 # Data Cleaning
-Before creating our linear models we needed to make sure that our data was clean. First, we checked for missing values. At first glance there did not appear to be any missing values. 
+Before creating our linear models, we needed to make sure that our data was clean. First, we checked for missing values. At first glance there did not appear to be any missing values. 
 ```{r}
 # Check for missing values in each column
 colSums(is.na(train))
@@ -54,7 +54,7 @@ Next, we created a summary of each variable in our data including the mean and f
 print(summary(train))
 ```
 
-This summary shows us the distribution of each variable. For example, we can see that the patients in the dataset range from age 21 to 70 with a median of 29 and mean of 33.3. Since we mean age is greater than the median age we can tell that the age distribution is skewed right. From this summary of the data we also observe some non-sensical values. For example some participants have a recorded BMI of 0 or an insulin value of 0, which cannot occur logically. Although there were no missing values above, we suspect that 0 was zero was recorded in place of missing data. The only variables for which a zero makes sense are pregnancies and outcome. For any other variable we'll fill zero with unknown and then evaluate the best way to handle unknowns. We will do this for both the train and test sets even though we won't be using the test data until later.
+This summary shows us the distribution of each variable. For example, we can see that the patients in the dataset range from age 21 to 70 with a median of 29 and mean of 33.3. Since we mean age is greater than the median age we can tell that the age distribution is skewed right. From this summary of the data we also observe some nonsensical values. For example some participants have a recorded BMI of 0 or an insulin value of 0, which cannot occur logically. Although there were no missing values above, we suspect that 0 was zero was recorded in place of missing data. The only variables for which a zero makes sense are pregnancies and outcome. For any other variable we'll fill zero with unknown and then evaluate the best way to handle unknowns. We will do this for both the train and test sets even though we won't be using the test data until later.
 
 ```{r}
 # List of columns where zero is non-sensical (i.e. zero indicates unknown)
@@ -93,7 +93,7 @@ train <- train[complete.cases(train), ]
 test <- test[complete.cases(test), ]
 ```
 
-Once the data was cleaned, we examined the basic descriptive statistics of our data again. There were only minor changes in the median and means of the data, with the biggest changes in the range of values. Colums no longer had 0 as a minimum value. The age ranged from 21 years old to 70 years old, plasma glucose levels ranged from 56 to 199, blood pressure ranged from 24 to 80, and BMI ranged from 18.40 to 67.10.
+Once the data was cleaned, we examined the basic descriptive statistics of our data again. There were only minor changes in the median and means of the data, with the biggest changes in the range of values. Columns no longer had 0 as a minimum value. The age ranged from 21 years old to 70 years old, plasma glucose levels ranged from 56 to 199, blood pressure ranged from 24 to 80, and BMI ranged from 18.40 to 67.10.
 
 ```{r}
 # Summary of columns
@@ -114,6 +114,7 @@ levels(test$Outcome) <- c("No", "Yes")
 
 
 # Analysis and Visualization
+
 ## Distribution of Reponse Variable
 ```{r}
 # Calculate proportion of patients with diabetes
@@ -240,14 +241,14 @@ reduced2 <- glm(Outcome~Pregnancies + Glucose + BMI + DiabetesPedigreeFunction +
 summary(reduced2)
 ```
 
-In this 5 variable model we observe that neither Age nor Diabetes Pedigree Function are statistically significant. Perhaps we should keep only Diabetes Pedigree Function?
+In this 5 variable model we observe that neither Age nor Diabetes Pedigree Function are statistically significant. Perhaps we should keep only Diabetes Pedigree Function because Age has a higher p-value. 
 
 ```{r}
 reduced3 <- glm(Outcome~Pregnancies + Glucose + BMI + DiabetesPedigreeFunction, family="binomial", data=train)
 summary(reduced3)
 ```
 
-Alas, in this four variable model all of the predictors are statistically significant. We will confirm this result by testing whether we can drop Age and Blood Pressure from our model. For this test our null hypothesis will be $H_0: \beta_{BloodPressure} = \beta_{Age} = 0$ and the alternative is $H_A:$ at least one $\beta$ in $H_0$ is non-zero. 
+Alas, in this four variable model all of the predictors are statistically significant. We will confirm this result by testing whether we can drop Age and Blood Pressure from our full model. For this test our null hypothesis will be $H_0: \beta_{BloodPressure} = \beta_{Age} = 0$ and the alternative is $H_A:$ at least one $\beta$ in $H_0$ is non-zero. 
 
 ```{r}
 # Test statistic
@@ -260,7 +261,7 @@ p_value2
 The p-value of 0.16 is not less than our significance level of 0.05 so we fail to reject the null hypothesis. We don't have enough evidence to say that any of the two variables (Age and Blood Pressure) we dropped in our new reduced model have a non-zero coefficient and thus we can use our reduced model with just Pregnancies, Glucose, BMI, and Diabetes Pedigree Function to predict diabetes.
 
 ## Test Whether Model is Useful
-Next, we'll test whether our reduced model is useful in predicting diabetes. In other words, can we drop all coefficients from our model? We'll start from our reduced model given the results from our hypothesis test above. For this test our null hypothesis will be $H_0: \beta_{Pregnancies} = \beta_{Glucose} = \beta_{BMI} = \beta_{DiabetesPedigreeFunction} = 0$ and the alternative is $H_A:$ at least one $\beta$ in $H_0$ is non-zero. 
+Next, we'll test whether our reduced model is useful in predicting diabetes. In other words, can we drop all coefficients from our model? We'll start from our reduced model with four predictors given the results from our hypothesis test above. For this test our null hypothesis will be $H_0: \beta_{Pregnancies} = \beta_{Glucose} = \beta_{BMI} = \beta_{DiabetesPedigreeFunction} = 0$ and the alternative is $H_A:$ at least one $\beta$ in $H_0$ is non-zero. 
 ```{r}
 # Test statistic
 test_stat3 <- reduced3$null.deviance - reduced$deviance
@@ -278,13 +279,7 @@ reduced3
 
 Our estimated logistic regression equation is: $log(\dfrac{\hat{\pi}}{1-\hat{\pi}}) = -8.90583 + 0.13145*Pregnancies + 0.03582*Glucose + 0.08697*BMI + 0.73497*DiabetesPedigreeFunction$. All three of these predictors have positive coefficients, suggesting that for larger number of pregnancies, higher glucose concentration, higher BMI, and higher diabetes pedigree function the odds of having diabetes goes up, with all other variables held constant.
 
-The estimated coefficient for pregnancies is 0.13145. This means that for each additional pregnancies the log odds that the woman will have diabetes increases by 0.13145 while controlling for glucose concentration and BMI. In other words, for each one unit increase in pregnancies the odds that the woman has diabetes is multiplied by 1.140481, while holding the other variables constant.
-
-```{r}
-exp(0.13145)
-```
-
-TODO: interpretations of other coefficients.
+The estimated coefficient for pregnancies is 0.13145. This means that for each additional pregnancy the log odds that the woman will have diabetes increases by 0.13145 while controlling for glucose concentration, BMI, and diabetes pedigree function. In other words, for each one unit increase in number of pregnancies the odds that the woman has diabetes is multiplied by 1.140481, while holding the other variables constant. The estimated coefficient for glucose is 0.03582. This means that for each one unit increase in plasma glucose concentration the log odds that the woman will have diabetes increases by 0.03582, while holding the other variables constant. The estimated coefficient for BMI is 0.08697, meaning that for each one unit increase in BMI, the log odds that the patient has diabetes increases by 0.08697 while controlling for glucose concentration, pregnancies, and diabetes pedigree function. Finally, the estimated coefficient for diabetes pedigree function is 0.73497, suggesting that for each one unit increase in diabetes pedigree function the log odds that the patient has diabetes increases by 0.73497 while holding the other variables constant. 
 
 
 ## Model Evaluation
@@ -328,5 +323,5 @@ table(test$Outcome, preds>threshold)
 # TNR
 174/(174+22)
 ```
-At a threshold of 0.5, the models' overall accuracy is 78% with a true positive rate of 55% and a true negative rate of 89%. 
+At a threshold of 0.5, the models' overall accuracy is 78% with a true positive rate of 55% and a true negative rate of 89%. These evaluation metrics suggest that the model is successful in identifying patients that develop diabetes. 
 
