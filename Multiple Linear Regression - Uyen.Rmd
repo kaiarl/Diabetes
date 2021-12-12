@@ -14,7 +14,7 @@ library(tidyverse)
 library(GGally)
 library(MASS)
 
-# Raw diabetes set
+# Raw diabetes set (768 rows by 9 variables)
 diabetes <- as_tibble(read.csv('diabetes2.csv'))
 
 
@@ -24,7 +24,7 @@ levels(diabetes$Outcome)
 levels(diabetes$Outcome) <- c("No","Yes")
 levels(diabetes$Outcome)
 
-# Diabetes set without Insulin, Skin Thickness and complete cases only 
+# Diabetes set without Insulin, Skin Thickness and complete cases only (724 rows by 7 variables)
 diabetes2 <- diabetes
 
 zero_unknown_cols <-c("Glucose", "BloodPressure", "SkinThickness",
