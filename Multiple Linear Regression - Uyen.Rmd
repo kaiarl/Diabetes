@@ -13,6 +13,8 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE)
 library(tidyverse)
 library(GGally)
 library(MASS)
+
+# Raw diabetes set
 diabetes <- as_tibble(read.csv('diabetes2.csv'))
 
 
@@ -22,107 +24,21 @@ levels(diabetes$Outcome)
 levels(diabetes$Outcome) <- c("No","Yes")
 levels(diabetes$Outcome)
 
+# Diabetes set without Insulin, Skin Thickness and complete cases only 
 diabetes2 <- diabetes
 
 zero_unknown_cols <-c("Glucose", "BloodPressure", "SkinThickness",
                       "Insulin", "BMI", "DiabetesPedigreeFunction",
                       "Age")
 
-
-
 diabetes2[,zero_unknown_cols] <- replace(diabetes2[,zero_unknown_cols], diabetes2[,zero_unknown_cols]==0,NA)
 
 diabetes2 <- dplyr::select(diabetes2, -c('SkinThickness', 'Insulin'))
-
-fill_missing_cols <-c("Glucose", "BloodPressure", "BMI",
-                      "DiabetesPedigreeFunction", "Age")
-
-for(i in fill_missing_cols) {
-  diabetes2[,i][is.na(diabetes2[,i])] <- median(diabetes2[,i][!is.na(diabetes2[,i])])
-}
+diabetes2 <- diabetes2[complete.cases(diabetes2),]
 ```
 
-The data cleaning will ensure ggplot will color correctly for variable Outcome
 
-```{r}
-# Scatter plot using GGpairs
-GGally::ggpairs(diabetes)
-```
-
-There were a lot of 0s in the plots and they might hurt the correlation so I removed them by Insulin then Glucose.
-
-```{r}
-# Filter out 0 values in Insulin and plot pairs
-noNullIns <- diabetes %>% filter(Insulin != 0)
-GGally::ggpairs(noNullIns)
-```
-
-Correlation and graphs look better after taking out 0s from Insulin!
-
-```{r}
-# Filter out 0 value in Glucose and plot pairs
-noNullInsGlu <- noNullIns %>% filter(Glucose != 0)
-GGally::ggpairs(noNullInsGlu)
-```
-
-Some correlations dropped after taking the 0 from Glucose, but graphs look better. 
-
-```{r}
-# Filter out 0 value in Glucose and plot pairs
-noNullInsGluBMI <- noNullInsGlu %>% filter(BMI != 0)
-GGally::ggpairs(noNullInsGluBMI)
-```
-
-I noticed some 0s in BMI so I removed them as well. 
-
-```{r}
-# Scatterplot of Glucose and Insulin with Outcome
-ggplot(noNullInsGluBMI, aes(Glucose, Insulin, color = Outcome)) +
-  geom_point()
-```
-
-The variance was non-constant so Idk.
-
-# First run for MLR
-
-```{r}
-# Full model and summary
-result <- lm(Glucose ~ Pregnancies + BloodPressure + SkinThickness + Insulin + BMI + DiabetesPedigreeFunction + Age, data=noNullInsGluBMI)
-summary(result)
-```
-
-Pregnancies, skin thickness, BMI, and diabetes pedigree function didn't look significant based on p-values in the presence of the other predictors. Partial F test will be conducted to see if we can drop these variables. 
-
-```{r}
-# Checking for multicollinearity
-faraway::vif(result)
-```
-
-Checking for multicollinearity signs in this model and it looks fine. Everything is definitely under 5 so we're in the clear. 
-
-```{r}
-reduced <- lm(Glucose ~ BloodPressure + Insulin + Age, data=noNullInsGluBMI)
-summary(reduced)
-```
-
-Everything is significant in the reduced model so we'll run with this. 
-
-```{r}
-# Checking for multicollinearity
-faraway::vif(reduced)
-```
-
-No signs of multicollinearity here either. 
-
-```{r}
-# Conducting partial F test
-anova(reduced, result)
-```
-
-Insignificant p-value so we failed to reject the null and favor the reduced model. 
-
-
-# Second run for MLR
+# Last iteration of MLR
 
 ## Scatterplots
 ```{r}
@@ -131,22 +47,13 @@ GGally::ggpairs(diabetes2)
 
 ## Full MLR with Pregnancies, Blood Pressure, BMI, DiabetesPedigeeFunction, and Age
 ```{r}
-result2 <- lm(Glucose ~ Pregnancies + BloodPressure + BMI + DiabetesPedigreeFunction + Age, data = diabetes2)
-summary(result2)
+result <- lm(Glucose ~ Pregnancies + BloodPressure + BMI + DiabetesPedigreeFunction + Age, data = diabetes2)
+summary(result)
 ```
 
-Pregnancies was insignificant in the presence of other variables so it's dropped.
-
-## Reduced MLR with Pregnancies dropped
 ```{r}
-reduced2 <- lm(Glucose ~ BloodPressure + BMI + DiabetesPedigreeFunction + Age, data = diabetes2)
-summary(reduced2)
-```
-
-## Residual plot of reduced model
-```{r}
-yhat <- result2$fitted.values
-res <- result2$residuals
+yhat <- result$fitted.values
+res <- result$residuals
 diabetes2 <- data.frame(diabetes2, yhat, res)
 
 ggplot(diabetes2, aes(x = yhat,y = res))+
@@ -154,27 +61,23 @@ ggplot(diabetes2, aes(x = yhat,y = res))+
   geom_hline(yintercept=0, color="red")+
   labs(x="Fitted y",
        y="Residuals",
-       title="Residual Plot")
+       title="Residual Plot from full MLR")
 ```
 
-## BoxCox of reduced model
+
 ```{r}
-boxcox(reduced2)
+boxcox(result)
 ```
 
-Does not need any transformation on the response variable
 
-## ACF of reduced model
 ```{r}
-acf(res, main = "ACF Plot of Reduced Residuals")
+acf(result$residuals)
 ```
-Lag 19 and 20 look sus
 
 
-## QQ plot of reduced
 ```{r}
-qqnorm(res)
-qqline(res, col = "red")
+qqnorm(result$residuals)
+qqline(result$residuals, col = "red")
 ```
 
 
@@ -185,27 +88,17 @@ diabetes2 <- data.frame(diabetes2, ystar)
 
 
 ```{r}
-reduced3 <- lm(Glucose ~ BloodPressure + BMI + DiabetesPedigreeFunction + Age, data = diabetes2)
-summary(reduced3)
-```
-
-```{r}
-boxcox(reduced3)
+resultLog <- lm(ystar ~ BloodPressure + BMI + DiabetesPedigreeFunction + Age, data = diabetes2)
+summary(resultLog)
 ```
 
 
 ```{r}
-reduced3log <- lm(ystar ~ BloodPressure + BMI + DiabetesPedigreeFunction + Age, data = diabetes2)
-summary(reduced3log)
-```
+yhatLog <- resultLog$fitted.values
+resLog <- resultLog$residuals
+diabetes2 <- data.frame(diabetes2, yhatLog, resLog)
 
-
-```{r}
-yhat3log <- reduced3log$fitted.values
-res3 <- reduced3log$residuals
-diabetes2 <- data.frame(diabetes2, yhat3log, res3)
-
-ggplot(diabetes2, aes(x = yhat3log,y = res3))+
+ggplot(diabetes2, aes(x = yhatLog,y = resLog))+
   geom_point()+
   geom_hline(yintercept=0, color="red")+
   labs(x="Fitted log y",
@@ -215,19 +108,19 @@ ggplot(diabetes2, aes(x = yhat3log,y = res3))+
 
 
 ```{r}
-boxcox(reduced3log)
+boxcox(resultLog)
 ```
 
 
 ```{r}
-acf(reduced3log$residuals)
+acf(resultLog$residuals)
 ```
 
 
 
 ```{r}
-qqnorm(reduced3log$residuals)
-qqline(reduced3log$residuals, col = "red")
+qqnorm(resultLog$residuals)
+qqline(resultLog$residuals, col = "red")
 ```
 
 
