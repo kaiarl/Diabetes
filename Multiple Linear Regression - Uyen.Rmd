@@ -9,6 +9,8 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE)
 
+setwd('/home/birb/Documents/UVA/Linear Models for Data Science/Diabetes')
+
 # Loading in tidyverse and dataset
 library(tidyverse)
 library(GGally)
@@ -105,7 +107,7 @@ diabetes2 <- data.frame(diabetes2, ystar)
 resultLog <- lm(ystar ~ BloodPressure + BMI + DiabetesPedigreeFunction + Age, data = diabetes2)
 summary(resultLog)
 
-# Here we fit a log-transformed version of the final model (without Pregnencies). 
+# Here we fit a log-transformed version of the final model (without Pregnancies). 
 # The model is highly significant (p-value of F-test is nearly 0). 
 # All of the individual explanatory variables are significant at the 95% confidence level. 
 # Unfortunately, the adjusted R-squared of the model is only 12.24%, which means it only explains 12.24% of the variation in blood glucose. 

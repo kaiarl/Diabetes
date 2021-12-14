@@ -6,10 +6,16 @@ output: pdf_document
 ---
 
 # Set up
-```{r, results = 'hide', message = FALSE}
+```{r include = FALSE}
+
+knitr::opts_chunk$set(include = FALSE, results = 'hide', message = FALSE)
+
 # Import libraries
 library(tidyverse)
 library(ROCR)
+library(GGally)
+library(MASS)
+library(faraway)
 ```
 
 ```{r}
@@ -28,7 +34,6 @@ print(dim(Data)) # 768 rows and 9 columns
 # Display names of all columns
 print(colnames(Data))
 ```
-
 
 Before we go any further with our analysis we will split our data into a training and test set. We've chosen a random seed of "123" for reproducability. We will do all further analysis, visualization, and model building using our training data and then use our test data to evaluate our model's performance on unseen data. Since our data isn't particularly large (768 rows), we chose a 60/40 split so that we would have more data for training and thus have more stable model results.
 ```{r}
@@ -74,7 +79,9 @@ Now that we have encoded our unknown values we checked what percent of observati
 # Check for missing values in each column again
 round(colSums(is.na(train))/dim(train)[1],2)
 ```
+
 We observed that a large portion of some columns have missing data, especially Insulin with 48% missing and SkinThickness with 30%. Now that we've identified the missing values we needed to handle them before we continue with our analysis. We removed variables with over 25% missing (Insulin and Skin Thickness) because we didn't think they would be reliable predictors with so much missing data and we didn't want to drop nearly 50% of our data.
+
 ```{r}
 # Remove variables with high percent missing
 train <- select(train, -c('SkinThickness', 'Insulin'))
@@ -145,6 +152,7 @@ ggplot(train, aes(x=Pregnancies, color=Outcome)) +
   geom_density() +
   labs(x="Number of Pregnancies", y="Density", title="Density Plot of Pregnancies by Diabetes Outcome")
 ```
+
 ### Glucose
 ```{r}
 # Side by side box plot
@@ -152,47 +160,58 @@ ggplot(train, aes(x=Outcome, y=Glucose))+
   geom_boxplot(color = "blue", outlier.color = "orange") +
   labs(x="Diabetes", y="Glucose Concentration", title="Distribution of Glucose Concentration by Diabetes Outcome")
 ```
+
 These box plots (especially from Q1 to Q3) have little overlap so we suspect that glucose will be predictive in identifying which patients have diabetes. From this visual we can see that patients with diabetes tend to have higher plasma glucose concentrations after a 2 hour oral glucose tolerance test. Values of over 200 indicate diabetes while values between 140 and 199 indicate prediabetes. The boxplot shows that most women diagnosed with diabetes have plasma glucose levels in the prediabetes range while those who do not have plasma glucose levels within the normal range. 
 
 ### Blood Pressure
+
 ```{r}
 # Density plot
 ggplot(train, aes(x=BloodPressure, color=Outcome)) +
   geom_density() +
   labs(x="Blood Pressure", y="Density", title="Density Plot of Blood Pressure by Diabetes Outcome")
 ```
+
 There is quite a bit of overlap in the density plots of diastolic blood pressure for those that do and do not have diabetes. While there is a lot of overlap we do observe that those with diabetes tend to have slightly higher diastolic blood pressure than those that do not. Normal diastolic blood pressure is less 80 mm Hg and those with a diastolic blood pressure above 90 mg Hg are considered to have high blood pressure. Prehypertension range from 80 mm Hg to 89 mm Hg. 
 
 ### BMI
+
 ```{r}
 # Side by side box plot
 ggplot(train, aes(x=Outcome, y=BMI))+
   geom_boxplot(color = "blue", outlier.color = "orange") +
   labs(x="Diabetes", y="BMI", title="Distribution of BMI by Diabetes Outcome")
 ```
+
 Patients with diabetes tend to have higher BMIs than those without. Those with a BMI over 25 are at higher risk for diabetes. In this sample, the box plot shows the BMI range for those with diabetes begins around 25.  
 
 ### Diabetes Pedigree Function
+
 ```{r}
 # Density plot
 ggplot(train, aes(x=DiabetesPedigreeFunction, color=Outcome)) +
   geom_density() +
   labs(x="Diabetes Pedigree Function", y="Density", title="Density Plot of Diabetes Pedigree Function by Diabetes Outcome")
 ```
+
 Those with lower Diabetes Pedigree Functions (less family history of diabetes) appear less likely to have diabetes. 
 
 ### Age
+
 ```{r}
 # Side by side box plot
 ggplot(train, aes(x=Outcome, y=Age))+
   geom_boxplot(color = "blue", outlier.color = "orange") +
   labs(x="Diabetes", y="Age", title="Distribution of Age by Diabetes Outcome")
 ```
+
 The median age of patients with diabetes is higher than those that do not have diabetes. The risk for developing diabetes begins to increase around age 45 and continues to increase as people age. The box plot shows the median age for both groups as under 45. However, we know those from minority populations, such as in this sample, are often diagnosed with diabetes at an earlier age. 
 
 
 ### Multiple Predictors and Response
+
 Next, we created scatter plots between pairs of potential predictors and colored the dots with the diabetes outcome. From this scatter plot of BMI versus age there does seem to be a relationship with diabetes where the women with diabetes tend to be higher BMIs and older as well. 
+
 ```{r}
 # Scatter plot of potential predictors (colored by response)
 # bmi and blood pressure colored by diabetes
@@ -201,6 +220,157 @@ ggplot(train, aes(x=BMI, y=Age, color=Outcome)) +
   labs(x="BMI", y="Age", title="Scatterplot of BMI versus Age by Diabetes")
 
 ```
+
+# Multiple Linear Regression
+
+```{r}
+# Raw diabetes set (768 rows by 9 variables)
+diabetes <- as_tibble(read.csv('diabetes2.csv'))
+
+
+# Change Outcome variable to factor with appropriate labels
+diabetes$Outcome <- factor(diabetes$Outcome)
+levels(diabetes$Outcome)
+levels(diabetes$Outcome) <- c("No","Yes")
+levels(diabetes$Outcome)
+
+# Diabetes set without Insulin, Skin Thickness and complete cases only (724 rows by 7 variables)
+diabetes2 <- diabetes
+
+zero_unknown_cols <-c("Glucose", "BloodPressure", "SkinThickness",
+                      "Insulin", "BMI", "DiabetesPedigreeFunction",
+                      "Age")
+
+diabetes2[,zero_unknown_cols] <- replace(diabetes2[,zero_unknown_cols], diabetes2[,zero_unknown_cols]==0,NA)
+
+diabetes2 <- dplyr::select(diabetes2, -c('SkinThickness', 'Insulin'))
+diabetes2 <- diabetes2[complete.cases(diabetes2),]
+```
+
+## Scatterplot
+
+```{r}
+GGally::ggpairs(diabetes2)
+
+# All of the potential explanatory variables have positive correlation to glucose, though none have a correlation coefficient above 27%.
+```
+
+## Full MLR with Pregnancies, Blood Pressure, BMI, DiabetesPedigeeFunction, and Age
+
+```{r}
+result <- lm(Glucose ~ Pregnancies + BloodPressure + BMI + DiabetesPedigreeFunction + Age, data = diabetes2)
+summary(result)
+
+# The full model is highly statistically significant in predicting glucose, judging by the F-test statstic.  
+# However, one of its explanatory variables, Pregnencies, is not (t-test p-value of 71%). 
+```
+
+
+```{r}
+yhat <- result$fitted.values
+res <- result$residuals
+diabetes2 <- data.frame(diabetes2, yhat, res)
+
+ggplot(diabetes2, aes(x = yhat,y = res))+
+  geom_point()+
+  geom_hline(yintercept=0, color="red")+
+  labs(x="Fitted y",
+       y="Residuals",
+       title="Residual Plot from full MLR")
+       
+# The residual scatterplot shows non-constant variance, suggesting a transformation on the y-variable is needed. 
+```
+
+
+```{r}
+boxcox(result)
+
+# According to the Box-Cox plot, we should take the log of the y-variable (glucose). 
+```
+
+
+```{r}
+acf(result$residuals)
+
+# The ACF plot does not show any significant autocorrelation. 
+```
+
+
+```{r}
+qqnorm(result$residuals)
+qqline(result$residuals, col = "red")
+
+# The QQ plot is not a perfect line, but it is close enough. 
+```
+
+
+```{r}
+ystar <- log(diabetes2$Glucose)
+diabetes2 <- data.frame(diabetes2, ystar)
+```
+
+
+## Final MLR with Blood Pressure, BMI, DiabetesPedigeeFunction, and Age
+```{r}
+resultLog <- lm(ystar ~ BloodPressure + BMI + DiabetesPedigreeFunction + Age, data = diabetes2)
+summary(resultLog)
+
+# Here we fit a log-transformed version of the final model (without Pregnancies). 
+# The model is highly significant (p-value of F-test is nearly 0). 
+# All of the individual explanatory variables are significant at the 95% confidence level. 
+# Unfortunately, the adjusted R-squared of the model is only 12.24%, which means it only explains 12.24% of the variation in blood glucose. 
+```
+
+
+```{r}
+yhatLog <- resultLog$fitted.values
+resLog <- resultLog$residuals
+diabetes2 <- data.frame(diabetes2, yhatLog, resLog)
+
+ggplot(diabetes2, aes(x = yhatLog,y = resLog))+
+  geom_point()+
+  geom_hline(yintercept=0, color="red")+
+  labs(x="Fitted log y",
+       y="Residuals",
+       title="Residual Plot from Reduced 3 log")
+       
+# The residual plot looks much better (mostly random). 
+```
+
+
+```{r}
+boxcox(resultLog)
+
+# The Box-Cox plot lines include 1, so no further transformation is necessary. 
+```
+
+
+```{r}
+acf(resultLog$residuals)
+
+# The ACF plot does not show any significant autocorrelation. 
+```
+
+
+
+```{r}
+qqnorm(resultLog$residuals)
+qqline(resultLog$residuals, col = "red")
+
+# The QQ plot is not a perfect line, but it is close enough. 
+```
+
+
+
+```{r}
+vif(resultLog)
+
+# The VIFs are very low and suggest that multicollinearity is not a problem. 
+```
+
+
+Our final model is statistically significant as a whole, and all of its explanatory variables are significant as well. The final model satisfies all the assumptions of linear regression. Multicollinearity is not a problem. The only issue is the low adjusted R-squared, which reduces the practical usefulness of the model.
+
 
 # Logistic Regression Model
 
@@ -217,6 +387,7 @@ Based on the summary of this initial logistic regression model we observe that G
 
 
 ## Test Hypothesis on Subset of Parameters
+
 We will test whether we can drop all three of these insignificant predictors. For this test our null hypothesis will be $H_0: \beta_{BloodPressure} = \beta_{DiabetesPredigreeFunction} = \beta_{Age} = 0$ and the alternative is $H_A:$ at least one $\beta$ in $H_0$ is non-zero. 
 
 ```{r}
@@ -262,6 +433,7 @@ The p-value of 0.16 is not less than our significance level of 0.05 so we fail t
 
 ## Test Whether Model is Useful
 Next, we'll test whether our reduced model is useful in predicting diabetes. In other words, can we drop all coefficients from our model? We'll start from our reduced model with four predictors given the results from our hypothesis test above. For this test our null hypothesis will be $H_0: \beta_{Pregnancies} = \beta_{Glucose} = \beta_{BMI} = \beta_{DiabetesPedigreeFunction} = 0$ and the alternative is $H_A:$ at least one $\beta$ in $H_0$ is non-zero. 
+
 ```{r}
 # Test statistic
 test_stat3 <- reduced3$null.deviance - reduced$deviance
@@ -273,6 +445,7 @@ p_value3
 The p-value for this hypothesis is 0 so we reject the null hypothesis and conclude that at least one of predictors has a non-zero coefficient and thus this logistic regression model is useful in estimating the odds of developing diabetes.
 
 ## Interpreting Model's Coefficients
+
 ```{r}
 reduced3
 ```
@@ -283,9 +456,11 @@ The estimated coefficient for pregnancies is 0.13145. This means that for each a
 
 
 ## Model Evaluation
+
 Use model built on training data to estimate the probabilities for observations in the unseen test data set. 
 
 ### Plot ROC curve
+
 ```{r}
 # Predicted diabetes rate
 preds <- predict(reduced3, newdata=test, type="response")
@@ -301,6 +476,7 @@ lines(x=c(0,1), y=c(0,1), col="red")
 The ROC curve lies above the straight diagonal line, suggesting that this model identifies/classifies people who have diabetes better than random.  
 
 ### Calculate AUC
+
 ```{r}
 auc <- performance(rates, measure="auc")
 auc@y.values
@@ -309,7 +485,7 @@ auc@y.values
 The value of AUC for the ROC curve above is 0.8386144. Since this value is greater than 0.5 the model does better than random for classifying who develops diabetes. 
 
 ### Create Confusion Matrix
-TODO QUESTION: what do we want to use for a threshold? I just did 0.5 for now, but maybe in predicting diabetes, due to the health implications, we may be more concerned about false negatives (classify someone as not having diabetes when they do have it) so we've chose a threshold lower than 0.5. With this lower threshold we'll have a lower false negative rate (as desired), but as a result would have a higher false positive rate. 
+
 ```{r}
 threshold = 0.5 # Define threshold
 table(test$Outcome, preds>threshold) 
@@ -323,5 +499,6 @@ table(test$Outcome, preds>threshold)
 # TNR
 174/(174+22)
 ```
+
 At a threshold of 0.5, the models' overall accuracy is 78% with a true positive rate of 55% and a true negative rate of 89%. These evaluation metrics suggest that the model is successful in identifying patients that develop diabetes. 
 
