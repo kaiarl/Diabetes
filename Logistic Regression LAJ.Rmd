@@ -221,6 +221,137 @@ ggplot(train, aes(x=BMI, y=Age, color=Outcome)) +
 
 ```
 
+# Logistic Regression Model
+
+Now that we had cleaned and visualized our data we could start fitting our models. For logistic regression we wanted to predict which patients have diabetes. 
+## Fit Initial Model
+For our initial logistic regression model we included all of our potential predictors (after dropping those with higher percent missing values), which included Pregnancies, Glucose, Blood Pressure, BMI, Diabetes Pedigree Function, and Age. 
+```{r}
+# Fit initial regression model
+full <- glm(Outcome~., family="binomial", data=train)
+summary(full)
+```
+
+Based on the summary of this initial logistic regression model we observe that Glucose and BMI and highly significant in predicting who has diabetes. These two variables had the largest differences in the density and box plots above so it is not surprising that they are highly predictive of diabetes. Pregnancies is also significant at a 5% significance level. The other predictors, Blood Pressure, Diabetes Pedigree Function, and Age do not add as much value given all of the other predictors are fit in the model. This does not mean that these three variables are not related to diabetes, it only means that they may not add value given that the other variables are also included in the model. 
+
+
+## Test Hypothesis on Subset of Parameters
+
+We will test whether we can drop all three of these insignificant predictors. For this test our null hypothesis will be $H_0: \beta_{BloodPressure} = \beta_{DiabetesPredigreeFunction} = \beta_{Age} = 0$ and the alternative is $H_A:$ at least one $\beta$ in $H_0$ is non-zero. 
+
+```{r}
+reduced <- glm(Outcome~Pregnancies + Glucose + BMI, family="binomial", data=train)
+summary(reduced)
+```
+
+All of the predictors in this three variable model are statistically significant. Let's test whether we can use this reduced model by calculating the difference in deviance between this reduced model and our full model. 
+
+```{r}
+# Test statistic
+test_stat <- reduced$deviance - full$deviance
+# P-value
+p_value <- 1 - pchisq(test_stat, 3)
+p_value
+```
+
+This p-value of 0.048 is less than our significance level of 0.05 so we reject the null hypothesis and conclude that at least one of the predictors that we dropped is useful in predicting diabetes. Looking back at the standard errors of our full model, we observed that Age and Diabetes Pedigree Function had p-values of 0.06, just above our cutoff of 0.05 so perhaps these two variables should remain in our model.
+
+```{r}
+reduced2 <- glm(Outcome~Pregnancies + Glucose + BMI + DiabetesPedigreeFunction + Age, family="binomial", data=train)
+summary(reduced2)
+```
+
+In this 5 variable model we observe that neither Age nor Diabetes Pedigree Function are statistically significant. Perhaps we should keep only Diabetes Pedigree Function because Age has a higher p-value. 
+
+```{r}
+reduced3 <- glm(Outcome~Pregnancies + Glucose + BMI + DiabetesPedigreeFunction, family="binomial", data=train)
+summary(reduced3)
+```
+
+Alas, in this four variable model all of the predictors are statistically significant. We will confirm this result by testing whether we can drop Age and Blood Pressure from our full model. For this test our null hypothesis will be $H_0: \beta_{BloodPressure} = \beta_{Age} = 0$ and the alternative is $H_A:$ at least one $\beta$ in $H_0$ is non-zero. 
+
+```{r}
+# Test statistic
+test_stat2 <- reduced3$deviance - full$deviance
+# P-value
+p_value2 <- 1 - pchisq(test_stat2, 2)
+p_value2
+```
+
+The p-value of 0.16 is not less than our significance level of 0.05 so we fail to reject the null hypothesis. We don't have enough evidence to say that any of the two variables (Age and Blood Pressure) we dropped in our new reduced model have a non-zero coefficient and thus we can use our reduced model with just Pregnancies, Glucose, BMI, and Diabetes Pedigree Function to predict diabetes.
+
+## Test Whether Model is Useful
+Next, we'll test whether our reduced model is useful in predicting diabetes. In other words, can we drop all coefficients from our model? We'll start from our reduced model with four predictors given the results from our hypothesis test above. For this test our null hypothesis will be $H_0: \beta_{Pregnancies} = \beta_{Glucose} = \beta_{BMI} = \beta_{DiabetesPedigreeFunction} = 0$ and the alternative is $H_A:$ at least one $\beta$ in $H_0$ is non-zero. 
+
+```{r}
+# Test statistic
+test_stat3 <- reduced3$null.deviance - reduced$deviance
+# P-value
+p_value3 <- 1 - pchisq(test_stat3, 4)
+p_value3
+```
+
+The p-value for this hypothesis is 0 so we reject the null hypothesis and conclude that at least one of predictors has a non-zero coefficient and thus this logistic regression model is useful in estimating the odds of developing diabetes.
+
+## Interpreting Model's Coefficients
+
+```{r}
+reduced3
+```
+
+Our estimated logistic regression equation is: $log(\dfrac{\hat{\pi}}{1-\hat{\pi}}) = -8.90583 + 0.13145*Pregnancies + 0.03582*Glucose + 0.08697*BMI + 0.73497*DiabetesPedigreeFunction$. All three of these predictors have positive coefficients, suggesting that for larger number of pregnancies, higher glucose concentration, higher BMI, and higher diabetes pedigree function the odds of having diabetes goes up, with all other variables held constant.
+
+The estimated coefficient for pregnancies is 0.13145. This means that for each additional pregnancy the log odds that the woman will have diabetes increases by 0.13145 while controlling for glucose concentration, BMI, and diabetes pedigree function. In other words, for each one unit increase in number of pregnancies the odds that the woman has diabetes is multiplied by 1.140481, while holding the other variables constant. The estimated coefficient for glucose is 0.03582. This means that for each one unit increase in plasma glucose concentration the log odds that the woman will have diabetes increases by 0.03582, while holding the other variables constant. The estimated coefficient for BMI is 0.08697, meaning that for each one unit increase in BMI, the log odds that the patient has diabetes increases by 0.08697 while controlling for glucose concentration, pregnancies, and diabetes pedigree function. Finally, the estimated coefficient for diabetes pedigree function is 0.73497, suggesting that for each one unit increase in diabetes pedigree function the log odds that the patient has diabetes increases by 0.73497 while holding the other variables constant. 
+
+
+## Model Evaluation
+
+Use model built on training data to estimate the probabilities for observations in the unseen test data set. 
+
+### Plot ROC curve
+
+```{r}
+# Predicted diabetes rate
+preds <- predict(reduced3, newdata=test, type="response")
+# Transform input data
+rates <- prediction(preds, test$Outcome)
+# Store true positive and false positive rates
+roc_result <- performance(rates, measure="tpr", x.measure="fpr")
+# Plot roc curve and overly diagonal (random)
+plot(roc_result, main = "ROC curve for Diabetes")
+lines(x=c(0,1), y=c(0,1), col="red")
+```
+
+The ROC curve lies above the straight diagonal line, suggesting that this model identifies/classifies people who have diabetes better than random.  
+
+### Calculate AUC
+
+```{r}
+auc <- performance(rates, measure="auc")
+auc@y.values
+```
+
+The value of AUC for the ROC curve above is 0.8386144. Since this value is greater than 0.5 the model does better than random for classifying who develops diabetes. 
+
+### Create Confusion Matrix
+
+```{r}
+threshold = 0.5 # Define threshold
+table(test$Outcome, preds>threshold) 
+```
+
+```{r}
+# Accuracy
+(174+52)/(174+22+43+52)
+# TPR
+52/(43+52)
+# TNR
+174/(174+22)
+```
+
+At a threshold of 0.5, the models' overall accuracy is 78% with a true positive rate of 55% and a true negative rate of 89%. These evaluation metrics suggest that the model is successful in identifying patients that develop diabetes. 
+
+
 # Multiple Linear Regression
 
 ```{r}
@@ -370,135 +501,4 @@ vif(resultLog)
 
 
 Our final model is statistically significant as a whole, and all of its explanatory variables are significant as well. The final model satisfies all the assumptions of linear regression. Multicollinearity is not a problem. The only issue is the low adjusted R-squared, which reduces the practical usefulness of the model.
-
-
-# Logistic Regression Model
-
-Now that we had cleaned and visualized our data we could start fitting our models. For logistic regression we wanted to predict which patients have diabetes. 
-## Fit Initial Model
-For our initial logistic regression model we included all of our potential predictors (after dropping those with higher percent missing values), which included Pregnancies, Glucose, Blood Pressure, BMI, Diabetes Pedigree Function, and Age. 
-```{r}
-# Fit initial regression model
-full <- glm(Outcome~., family="binomial", data=train)
-summary(full)
-```
-
-Based on the summary of this initial logistic regression model we observe that Glucose and BMI and highly significant in predicting who has diabetes. These two variables had the largest differences in the density and box plots above so it is not surprising that they are highly predictive of diabetes. Pregnancies is also significant at a 5% significance level. The other predictors, Blood Pressure, Diabetes Pedigree Function, and Age do not add as much value given all of the other predictors are fit in the model. This does not mean that these three variables are not related to diabetes, it only means that they may not add value given that the other variables are also included in the model. 
-
-
-## Test Hypothesis on Subset of Parameters
-
-We will test whether we can drop all three of these insignificant predictors. For this test our null hypothesis will be $H_0: \beta_{BloodPressure} = \beta_{DiabetesPredigreeFunction} = \beta_{Age} = 0$ and the alternative is $H_A:$ at least one $\beta$ in $H_0$ is non-zero. 
-
-```{r}
-reduced <- glm(Outcome~Pregnancies + Glucose + BMI, family="binomial", data=train)
-summary(reduced)
-```
-
-All of the predictors in this three variable model are statistically significant. Let's test whether we can use this reduced model by calculating the difference in deviance between this reduced model and our full model. 
-
-```{r}
-# Test statistic
-test_stat <- reduced$deviance - full$deviance
-# P-value
-p_value <- 1 - pchisq(test_stat, 3)
-p_value
-```
-
-This p-value of 0.048 is less than our significance level of 0.05 so we reject the null hypothesis and conclude that at least one of the predictors that we dropped is useful in predicting diabetes. Looking back at the standard errors of our full model, we observed that Age and Diabetes Pedigree Function had p-values of 0.06, just above our cutoff of 0.05 so perhaps these two variables should remain in our model.
-
-```{r}
-reduced2 <- glm(Outcome~Pregnancies + Glucose + BMI + DiabetesPedigreeFunction + Age, family="binomial", data=train)
-summary(reduced2)
-```
-
-In this 5 variable model we observe that neither Age nor Diabetes Pedigree Function are statistically significant. Perhaps we should keep only Diabetes Pedigree Function because Age has a higher p-value. 
-
-```{r}
-reduced3 <- glm(Outcome~Pregnancies + Glucose + BMI + DiabetesPedigreeFunction, family="binomial", data=train)
-summary(reduced3)
-```
-
-Alas, in this four variable model all of the predictors are statistically significant. We will confirm this result by testing whether we can drop Age and Blood Pressure from our full model. For this test our null hypothesis will be $H_0: \beta_{BloodPressure} = \beta_{Age} = 0$ and the alternative is $H_A:$ at least one $\beta$ in $H_0$ is non-zero. 
-
-```{r}
-# Test statistic
-test_stat2 <- reduced3$deviance - full$deviance
-# P-value
-p_value2 <- 1 - pchisq(test_stat2, 2)
-p_value2
-```
-
-The p-value of 0.16 is not less than our significance level of 0.05 so we fail to reject the null hypothesis. We don't have enough evidence to say that any of the two variables (Age and Blood Pressure) we dropped in our new reduced model have a non-zero coefficient and thus we can use our reduced model with just Pregnancies, Glucose, BMI, and Diabetes Pedigree Function to predict diabetes.
-
-## Test Whether Model is Useful
-Next, we'll test whether our reduced model is useful in predicting diabetes. In other words, can we drop all coefficients from our model? We'll start from our reduced model with four predictors given the results from our hypothesis test above. For this test our null hypothesis will be $H_0: \beta_{Pregnancies} = \beta_{Glucose} = \beta_{BMI} = \beta_{DiabetesPedigreeFunction} = 0$ and the alternative is $H_A:$ at least one $\beta$ in $H_0$ is non-zero. 
-
-```{r}
-# Test statistic
-test_stat3 <- reduced3$null.deviance - reduced$deviance
-# P-value
-p_value3 <- 1 - pchisq(test_stat3, 4)
-p_value3
-```
-
-The p-value for this hypothesis is 0 so we reject the null hypothesis and conclude that at least one of predictors has a non-zero coefficient and thus this logistic regression model is useful in estimating the odds of developing diabetes.
-
-## Interpreting Model's Coefficients
-
-```{r}
-reduced3
-```
-
-Our estimated logistic regression equation is: $log(\dfrac{\hat{\pi}}{1-\hat{\pi}}) = -8.90583 + 0.13145*Pregnancies + 0.03582*Glucose + 0.08697*BMI + 0.73497*DiabetesPedigreeFunction$. All three of these predictors have positive coefficients, suggesting that for larger number of pregnancies, higher glucose concentration, higher BMI, and higher diabetes pedigree function the odds of having diabetes goes up, with all other variables held constant.
-
-The estimated coefficient for pregnancies is 0.13145. This means that for each additional pregnancy the log odds that the woman will have diabetes increases by 0.13145 while controlling for glucose concentration, BMI, and diabetes pedigree function. In other words, for each one unit increase in number of pregnancies the odds that the woman has diabetes is multiplied by 1.140481, while holding the other variables constant. The estimated coefficient for glucose is 0.03582. This means that for each one unit increase in plasma glucose concentration the log odds that the woman will have diabetes increases by 0.03582, while holding the other variables constant. The estimated coefficient for BMI is 0.08697, meaning that for each one unit increase in BMI, the log odds that the patient has diabetes increases by 0.08697 while controlling for glucose concentration, pregnancies, and diabetes pedigree function. Finally, the estimated coefficient for diabetes pedigree function is 0.73497, suggesting that for each one unit increase in diabetes pedigree function the log odds that the patient has diabetes increases by 0.73497 while holding the other variables constant. 
-
-
-## Model Evaluation
-
-Use model built on training data to estimate the probabilities for observations in the unseen test data set. 
-
-### Plot ROC curve
-
-```{r}
-# Predicted diabetes rate
-preds <- predict(reduced3, newdata=test, type="response")
-# Transform input data
-rates <- prediction(preds, test$Outcome)
-# Store true positive and false positive rates
-roc_result <- performance(rates, measure="tpr", x.measure="fpr")
-# Plot roc curve and overly diagonal (random)
-plot(roc_result, main = "ROC curve for Diabetes")
-lines(x=c(0,1), y=c(0,1), col="red")
-```
-
-The ROC curve lies above the straight diagonal line, suggesting that this model identifies/classifies people who have diabetes better than random.  
-
-### Calculate AUC
-
-```{r}
-auc <- performance(rates, measure="auc")
-auc@y.values
-```
-
-The value of AUC for the ROC curve above is 0.8386144. Since this value is greater than 0.5 the model does better than random for classifying who develops diabetes. 
-
-### Create Confusion Matrix
-
-```{r}
-threshold = 0.5 # Define threshold
-table(test$Outcome, preds>threshold) 
-```
-
-```{r}
-# Accuracy
-(174+52)/(174+22+43+52)
-# TPR
-52/(43+52)
-# TNR
-174/(174+22)
-```
-
-At a threshold of 0.5, the models' overall accuracy is 78% with a true positive rate of 55% and a true negative rate of 89%. These evaluation metrics suggest that the model is successful in identifying patients that develop diabetes. 
 
