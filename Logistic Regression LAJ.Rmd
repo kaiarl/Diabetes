@@ -2,7 +2,10 @@
 title: "Diabetes Logistic Regression"
 author: "Lee Ann Johnson"
 date: "12/12/2021"
-output: pdf_document
+output: 
+  pdf_document:
+    latex_engine: xelatex
+
 ---
 
 # Set up
