@@ -21,6 +21,22 @@ library(MASS)
 library(faraway)
 ```
 
+# Executive Summary
+
+In the United States, the number of people who are diagnosed with diabetes has been steadily increasing. This is true for both children and adults. Diabetes is considered a chronic condition, meaning that it is long lasting, typically for the rest of an individual’s life. Those with diabetes have difficulty using the food they eat for energy in the body.  When a person eats food, the body breaks down the sugars in the food, also known as glucose, so that it can enter the bloodstream. Glucose is energy for the body. As the levels of glucose in the bloodstream rise, the body produces a substance known as insulin. Insulin allows the glucose in the blood to be used by cells in the body. Individuals who have been diagnosed with diabetes either cannot use the insulin they make (Type 2 Diabetes) or do not make enough insulin (Type 1 Diabetes).
+
+Some groups of people have a higher risk of developing diabetes. For example, when compared to the general population, some groups, such as women of American Indian/Alaskan Native heritage, are more likely to be diagnosed with the disease. Other important risk factors for diabetes have been identified. Those with a high body mass index (BMI), high blood pressure, or who are 65 or older have a higher likelihood of developing diabetes.
+
+It is important to understand diabetes in populations that are at high risk for developing the disease. A study at the University of Virginia School of Data Science sought to do just that. The study focused on women of Pima Indian heritage and tried to predict which of the women would be diagnosed with diabetes as well as levels of glucose in the blood. The researchers identified several aspects of health that might be related to a diabetes diagnosis or the amount of glucose in the bloodstream; number of pregnancies, glucose levels, diastolic blood pressure, BMI, family history of diabetes, and age. 
+
+The researchers found approximately 36% of women in the study, who were between 21 years old and 70 years old, were diagnosed with diabetes. They also discovered that when compared to women without diabetes, the women with diabetes tended to have had more pregnancies and a higher level of glucose in their bloodstream. The women also seemed to have a higher BMI and to be older. Findings in the study identified most women in the sample, regardless of a diabetes diagnosis, reported a BMI over 25. A BMI over 25 places individuals at an increased risk of diabetes.
+
+In women of Pima Indian heritage, researchers found four factors that were statistically important in predicting a diabetes diagnosis ; number of pregnancies, level of glucose in the blood, BMI, and family history of diabetes. For women of Pima Indian heritage, as pregnancies, glucose in the bloodstream, BMI and families members with diabetes increased, so did the chances of developing diabetes. The other factors investigated by the study (blood pressure and age) were not statistically important when trying to predict a diagnosis of diabetes. 
+
+Researchers also tried to create a model that could better predict an individual’s level of glucose in the bloodstream. The investigative team found that a person’s blood pressure, BMI, age, and their family history of diabetes could predict the level of glucose in the blood. Unfortunately, these four factors explained very little, only 13%, of the changes in glucose. Because of this, researchers recommended that future studies investigate other factors that may help healthcare providers understand levels of glucose in the bloodstream. 
+
+Healthcare providers can now better assess the risk of diabetes in women of Pima Indian heritage. This can help providers identify which women are most at risk of developing the disease. Once providers are aware of who is at high risk, better recommendations for diabetes screening can be made. Similar models can be made to help healthcare providers to assess the risk of diabetes in other groups of people. These models can improve healthcare in underserved areas, where resources for diabetes screening may be scarce. 
+
 ```{r}
 # Load data
 Data <- read.csv("diabetes2.csv", header=T)
@@ -28,6 +44,7 @@ print(head(Data))
 ```
 
 The data has 768 rows and 9 columns. One of these columns (Outcome) will be our response variable for our logistic regression and the others are potential predictors.
+
 ```{r}
 # Check dimensions of data
 print(dim(Data)) # 768 rows and 9 columns
